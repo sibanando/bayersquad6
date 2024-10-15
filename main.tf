@@ -1,4 +1,3 @@
-# main.tf
 provider "azurerm" {
   features {}
 }
@@ -25,7 +24,7 @@ resource "azurerm_subnet" "aks_subnet" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# Azure Kubernetes Service Cluster
+# Azure Kubernetes Service (AKS) Cluster
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = "aks-cluster"
   location            = azurerm_resource_group.aks_rg.location
@@ -43,15 +42,18 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
-  # Enable RBAC directly
-  rbac_enabled = true
+  # Addon profile for monitoring
+  addon_profile {
+    oms_agent {
+      enabled                    = true
+      log_analytics_workspace_id  = azurerm_log_analytics_workspace.aks_log.id
+    }
+  }
 
   network_profile {
     network_plugin = "azure"
     dns_service_ip = "10.0.2.10"
     service_cidr   = "10.0.2.0/24"
-    # The docker_bridge_cidr is no longer needed
-    # docker_bridge_cidr = "172.17.0.1/16"  # Removed
   }
 }
 
@@ -71,19 +73,12 @@ resource "azurerm_role_assignment" "aks_acr_assignment" {
   scope                = azurerm_container_registry.acr.id
 }
 
-# Log Analytics Workspace for monitoring 
+# Log Analytics Workspace for monitoring
 resource "azurerm_log_analytics_workspace" "aks_log" {
   name                = "aks-log-analytics"
   location            = azurerm_resource_group.aks_rg.location
   resource_group_name = azurerm_resource_group.aks_rg.name
   sku                 = "PerGB2018"
-}
-
-# AKS Monitoring Solution 
-resource "azurerm_kubernetes_cluster" "aks_monitoring" {
-  monitoring {
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.aks_log.id
-  }
 }
 
 # Output the Kubernetes configuration for kubectl
