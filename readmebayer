@@ -1,0 +1,1 @@
+main.tf - Terraform code to provision AKS, Azure Container Registry (ACR), and other required resources.
