@@ -80,13 +80,6 @@ resource "azurerm_log_analytics_workspace" "aks_log" {
   sku                 = "PerGB2018"
 }
 
-# AKS Monitoring Solution
-resource "azurerm_kubernetes_cluster" "aks" {
-  monitoring {
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.aks_log.id
-  }
-}
-
 # Output the Kubernetes configuration for kubectl
 output "kube_config" {
   value = azurerm_kubernetes_cluster.aks.kube_config_raw
