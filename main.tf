@@ -43,22 +43,21 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
-  # Role-based Access Control (RBAC)
-  role_based_access_control {
-    enabled = true
-  }
+  # Enable RBAC directly
+  rbac_enabled = true
 
   network_profile {
     network_plugin = "azure"
     dns_service_ip = "10.0.2.10"
     service_cidr   = "10.0.2.0/24"
-    docker_bridge_cidr = "172.17.0.1/16"
+    # The docker_bridge_cidr is no longer needed
+    # docker_bridge_cidr = "172.17.0.1/16"  # Removed
   }
 }
 
-# Azure Container Registry (ACR) 
+# Azure Container Registry (ACR) (Optional)
 resource "azurerm_container_registry" "acr" {
-  name                = "bayeracr"
+  name                = "myacr"
   resource_group_name = azurerm_resource_group.aks_rg.name
   location            = azurerm_resource_group.aks_rg.location
   sku                 = "Basic"
@@ -72,7 +71,7 @@ resource "azurerm_role_assignment" "aks_acr_assignment" {
   scope                = azurerm_container_registry.acr.id
 }
 
-# Log Analytics Workspace for monitoring
+# Log Analytics Workspace for monitoring (optional)
 resource "azurerm_log_analytics_workspace" "aks_log" {
   name                = "aks-log-analytics"
   location            = azurerm_resource_group.aks_rg.location
@@ -80,9 +79,16 @@ resource "azurerm_log_analytics_workspace" "aks_log" {
   sku                 = "PerGB2018"
 }
 
+# AKS Monitoring Solution (optional)
+resource "azurerm_kubernetes_cluster" "aks_monitoring" {
+  monitoring {
+    log_analytics_workspace_id = azurerm_log_analytics_workspace.aks_log.id
+  }
+}
+
 # Output the Kubernetes configuration for kubectl
 output "kube_config" {
-  value = azurerm_kubernetes_cluster.aks.kube_config_raw
+  value     = azurerm_kubernetes_cluster.aks.kube_config_raw
   sensitive = true
 }
 
