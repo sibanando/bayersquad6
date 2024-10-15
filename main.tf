@@ -53,14 +53,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
-  # Addon profile for monitoring
-  addon_profile {
-    oms_agent {
-      enabled                    = true
-      log_analytics_workspace_id  = azurerm_log_analytics_workspace.aks_log.id
-    }
-  }
-
   network_profile {
     network_plugin = "azure"
     dns_service_ip = "10.0.2.10"
