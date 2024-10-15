@@ -11,7 +11,7 @@ resource "azurerm_resource_group" "aks_rg" {
 
 # Azure Container Registry (ACR)
 resource "azurerm_container_registry" "acr" {
-  name                = "myACR"
+  name                = "acrsqaud6"
   resource_group_name = azurerm_resource_group.aks_rg.name
   location            = azurerm_resource_group.aks_rg.location
   sku                 = "Basic"
