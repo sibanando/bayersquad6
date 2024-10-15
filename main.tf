@@ -1,16 +1,27 @@
+
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"  # Allows versions in the 4.x range
+      version = "~> 4.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
     }
   }
 }
 
-
 # Azure provider setup
 provider "azurerm" {
   features {}
+}
+
+# Kubernetes provider setup (uses the AKS kubeconfig)
+provider "kubernetes" {
+  host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
+  token                  = azurerm_kubernetes_cluster.aks.kube_config[0].access_token
 }
 
 # Azure Resource Group
@@ -84,9 +95,78 @@ resource "azurerm_log_analytics_workspace" "aks_log" {
   sku                 = "PerGB2018"
 }
 
+# Persistent Volume (PV) for Kubernetes
+resource "kubernetes_persistent_volume" "pv" {
+  metadata {
+    name = "aks-pv"
+  }
+  spec {
+    capacity = {
+      storage = "5Gi"
+    }
+    access_modes = ["ReadWriteOnce"]
+    persistent_volume_source {
+      azure_disk {
+        disk_name    = "aks-disk"
+        disk_uri     = azurerm_managed_disk.data_disk.id
+        kind         = "Managed"
+        storage_account_type = "Standard_LRS"
+      }
+    }
+  }
+}
+
+# Persistent Volume Claim (PVC)
+resource "kubernetes_persistent_volume_claim" "pvc" {
+  metadata {
+    name = "aks-pvc"
+  }
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "5Gi"
+      }
+    }
+  }
+}
+
+# Pod with Persistent Volume Claim
+resource "kubernetes_pod" "nginx" {
+  metadata {
+    name = "nginx-pod"
+  }
+  spec {
+    container {
+      image = "nginx"
+      name  = "nginx"
+      volume_mount {
+        name       = "storage"
+        mount_path = "/usr/share/nginx/html"
+      }
+    }
+
+    volume {
+      name = "storage"
+      persistent_volume_claim {
+        claim_name = kubernetes_persistent_volume_claim.pvc.metadata[0].name
+      }
+    }
+  }
+}
+
+# Azure Managed Disk for PV (Optional)
+resource "azurerm_managed_disk" "data_disk" {
+  name                 = "aks-disk"
+  location             = azurerm_resource_group.aks_rg.location
+  resource_group_name  = azurerm_resource_group.aks_rg.name
+  storage_account_type = "Standard_LRS"
+  disk_size_gb         = 5
+  create_option        = "Empty"
+}
+
 # Output the Kubernetes configuration for kubectl
 output "kube_config" {
   value     = azurerm_kubernetes_cluster.aks.kube_config_raw
   sensitive = true
 }
-
