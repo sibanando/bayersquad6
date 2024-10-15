@@ -22,7 +22,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   name                = "aks-cluster"
   location            = azurerm_resource_group.aks_rg.location
   resource_group_name = azurerm_resource_group.aks_rg.name
-  dns_prefix          = "myakscluster"
+  dns_prefix          = "myaks"
 
   default_node_pool {
     name       = "default"
@@ -39,33 +39,23 @@ resource "azurerm_kubernetes_cluster" "aks" {
     load_balancer_sku = "standard" # Corrected to lowercase
     network_policy    = "calico"
   }
-
-  lifecycle {
-    ignore_changes = [
-      default_node_pool[0].node_count
-    ]
-  }
 }
 
-# Output the AKS Cluster details
+# Additional Node Pool
+resource "azurerm_kubernetes_cluster_node_pool" "aks_nodes" {
+  name                  = "systempool"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  vm_size               = "Standard_DS2_v2"
+  node_count            = 2
+}
+
+# Outputs
 output "kubernetes_cluster_name" {
   value = azurerm_kubernetes_cluster.aks.name
 }
 
-output "kubernetes_cluster_url" {
-  value = azurerm_kubernetes_cluster.aks.kube_config[0].host
-}
-
-# Output the ACR login details
-output "acr_login_server" {
+output "container_registry" {
   value = azurerm_container_registry.acr.login_server
 }
 
-output "acr_admin_username" {
-  value = azurerm_container_registry.acr.admin_username
-}
-
-output "acr_admin_password" {
-  value = azurerm_container_registry.acr.admin_password
-}
 
