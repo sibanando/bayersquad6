@@ -1,12 +1,12 @@
-# Specify the version of Terraform and required providers
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"  # Ensure you're using a version that supports AKS monitoring
+      version = "~> 4.0"  # Allows versions in the 4.x range
     }
   }
 }
+
 
 # Azure provider setup
 provider "azurerm" {
