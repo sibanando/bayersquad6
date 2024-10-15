@@ -55,7 +55,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 }
 
-# Azure Container Registry (ACR) (Optional)
+# Azure Container Registry (ACR)
 resource "azurerm_container_registry" "acr" {
   name                = "myacr"
   resource_group_name = azurerm_resource_group.aks_rg.name
@@ -71,7 +71,7 @@ resource "azurerm_role_assignment" "aks_acr_assignment" {
   scope                = azurerm_container_registry.acr.id
 }
 
-# Log Analytics Workspace for monitoring (optional)
+# Log Analytics Workspace for monitoring 
 resource "azurerm_log_analytics_workspace" "aks_log" {
   name                = "aks-log-analytics"
   location            = azurerm_resource_group.aks_rg.location
@@ -79,7 +79,7 @@ resource "azurerm_log_analytics_workspace" "aks_log" {
   sku                 = "PerGB2018"
 }
 
-# AKS Monitoring Solution (optional)
+# AKS Monitoring Solution 
 resource "azurerm_kubernetes_cluster" "aks_monitoring" {
   monitoring {
     log_analytics_workspace_id = azurerm_log_analytics_workspace.aks_log.id
