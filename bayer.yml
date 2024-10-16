@@ -1,32 +1,94 @@
-name: Deploy to Azure
+name: Build, Test, and Deploy Appointment & Patient Services to AKS
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger on push to the main branch
+
+env:
+  ACR_NAME: ${{ secrets.ACR_LOGIN_SERVER }}
+  AKS_CLUSTER_NAME: bayer-aks-cluster
+  AKS_RESOURCE_GROUP: bayer-aks-resource-group
+  APPOINTMENT_IMAGE_TAG: ${{ github.sha }}-appointment  # Version for appointment-service
+  PATIENT_IMAGE_TAG: ${{ github.sha }}-patient  # Version for patient-service
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout the repository
+        uses: actions/checkout@v2
 
-    - name: Log in to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-    - name: Build and Push Docker Image
-      run: |
-        docker build -t myapp:${{ github.sha }} .
-        echo "${{ secrets.AZURE_CLIENT_SECRET }}" | docker login azure --username ${{ secrets.AZURE_CLIENT_ID }} --password-stdin
-        docker tag myapp:${{ github.sha }} myregistry.azurecr.io/myapp:${{ github.sha }}
-        docker push myregistry.azurecr.io/myapp:${{ github.sha }}
+      - name: Log in to Azure CLI
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: "my-app-service-name"
-        images: "myregistry.azurecr.io/myapp:${{ github.sha }}"
+      - name: Log in to Azure Container Registry
+        run: |
+          echo ${{ secrets.ACR_LOGIN_PASSWORD }} | docker login ${{ secrets.ACR_LOGIN_SERVER }} --username ${{ secrets.ACR_LOGIN_USERNAME }} --password-stdin
+
+      - name: Build Docker image for appointment-service
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/appointment-service:${{ env.APPOINTMENT_IMAGE_TAG }} ./appointment-service
+
+      - name: Build Docker image for patient-service
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/patient-service:${{ env.PATIENT_IMAGE_TAG }} ./patient-service
+
+      - name: Push Docker image for appointment-service
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/appointment-service:${{ env.APPOINTMENT_IMAGE_TAG }}
+
+      - name: Push Docker image for patient-service
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/patient-service:${{ env.PATIENT_IMAGE_TAG }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v2
+        with:
+          version: "latest"
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER_NAME }}
+
+      - name: Deploy appointment-service to AKS
+        run: |
+          kubectl set image deployment/appointment-service appointment-service=${{ secrets.ACR_LOGIN_SERVER }}/appointment-service:${{ env.APPOINTMENT_IMAGE_TAG }}
+
+      - name: Deploy patient-service to AKS
+        run: |
+          kubectl set image deployment/patient-service patient-service=${{ secrets.ACR_LOGIN_SERVER }}/patient-service:${{ env.PATIENT_IMAGE_TAG }}
+
+  test:
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Test AKS connectivity for appointment-service
+        run: |
+          kubectl get pods -l app=appointment-service
+          kubectl get services -l app=appointment-service
+
+      - name: Test AKS connectivity for patient-service
+        run: |
+          kubectl get pods -l app=patient-service
+          kubectl get services -l app=patient-service
+
+      - name: Verify appointment-service deployment
+        run: |
+          kubectl rollout status deployment/appointment-service
+
+      - name: Verify patient-service deployment
+        run: |
+          kubectl rollout status deployment/patient-service
